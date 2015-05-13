@@ -26,6 +26,7 @@ package org.sosy_lab.cpachecker.cpa.smgfork;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.io.IOException;
+import java.io.Writer;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Collection;
@@ -111,6 +112,10 @@ public class SMGTransferRelation extends SingleEdgeTransferRelation {
   @FileOption(Type.OUTPUT_FILE)
   private Path exportSMGFilePattern = Paths.get("smg-%s.dot");
 
+  @Option(secure=true, name="visualisation.file", description = "Filename for visualisation analysis schema")
+  @FileOption(Type.OUTPUT_FILE)
+  private Path visualisationFile = Paths.get("visualisationSchema.json");
+
   @Option(secure=true, description = "with this option enabled, a check for unreachable memory occurs whenever a function returns, and not only at the end of the main function")
   private boolean checkForMemLeaksAtEveryFrameDrop = true;
 
@@ -147,6 +152,11 @@ public class SMGTransferRelation extends SingleEdgeTransferRelation {
    */
   public static final String FUNCTION_RETURN_VAR = "___cpa_temp_result_var_";
 
+  /**
+   * Path to the file where analysis tree for visualisation is stored
+   */
+//  private Path analysisSchema;
+
   private class SMGBuiltins {
 
     private static final int MEMSET_BUFFER_PARAMETER = 0;
@@ -172,7 +182,7 @@ public class SMGTransferRelation extends SingleEdgeTransferRelation {
       if (exportSMGFilePattern != null && currentState != null) {
         if (name == null) {
           if (currentState.getPredecessor() == null) {
-            name = String.format("initial-%03d", currentState.getId());
+            name = String.format("%03d-initial", currentState.getId());
           } else {
             name = String.format("%03d-%03d", currentState.getPredecessor().getId(), currentState.getId());
           }
@@ -187,6 +197,29 @@ public class SMGTransferRelation extends SingleEdgeTransferRelation {
         }
       }
     }
+
+    private void dumpStateJSON(SMGState currentState, Collection<SMGState> successors){
+      if (visualisationFile != null) {
+        Path outputFile = Paths.get(
+            visualisationFile.toAbsolutePath().getPath());
+        StringBuilder contentSb = new StringBuilder();
+        contentSb.append((String.format("{\n \"state\" : \"%03d\",\n\"succ\" : [",
+            currentState.getId())));
+        for (SMGState state : successors) {
+          contentSb.append(String.format("\"%03d\",", state.getId()));
+        }
+        contentSb.deleteCharAt(contentSb.length() - 1);
+        contentSb.append("]\n},\n");
+
+        String content = contentSb.toString();
+        try{
+          Files.appendToFile(outputFile, content);
+        } catch (IOException e) {
+          logger.logUserException(Level.WARNING, e, "Could not write to visualisation schema file");
+        }
+      }
+    }
+
 
     protected Path getOutputFile(Path pExportSMGFilePattern, String pName) {
       return Paths.get(String.format(pExportSMGFilePattern.toAbsolutePath().getPath(), pName));
@@ -422,6 +455,13 @@ public class SMGTransferRelation extends SingleEdgeTransferRelation {
     logger = new LogManagerWithoutDuplicates(pLogger);
     machineModel = pMachineModel;
     expressionEvaluator = new SMGRightHandSideEvaluator(logger, machineModel);
+    // initialize visualisation file
+    Path outputVisualFile = Paths.get(visualisationFile.toAbsolutePath().getPath());
+    try {
+      Files.writeFile(outputVisualFile, "[");
+    } catch (IOException e) {
+      logger.logUserException(Level.WARNING, e, "Cannot write to visualisation file");
+    }
   }
 
   @Override
@@ -435,6 +475,10 @@ public class SMGTransferRelation extends SingleEdgeTransferRelation {
     SMGState successor;
 
     SMGState smgState = (SMGState) state;
+
+    if (smgState.getPredecessor() == null) {
+      plotWhenConfigured("interesting", null, smgState, "initial state");
+    }
 
     switch (cfaEdge.getEdgeType()) {
     case DeclarationEdge:
@@ -509,14 +553,14 @@ public class SMGTransferRelation extends SingleEdgeTransferRelation {
       mallocFailState.setPredecessor(smgState);
       result = ImmutableSet.of(successor, mallocFailState);
       mallocFailState = null;
-    } else {
-      successor.setPredecessor(smgState);
+    } else {successor.setPredecessor(smgState);
       result = Collections.singleton(successor);
     }
-
-    for (SMGState smg : result) {
+ for (SMGState smg : result) {
       plotWhenConfigured("every", null, smg, cfaEdge.getDescription());
     }
+
+    builtins.dumpStateJSON(smgState, result);
 
     return result;
   }
@@ -882,6 +926,7 @@ public class SMGTransferRelation extends SingleEdgeTransferRelation {
       CType rValueType = expressionEvaluator.getRealExpressionType(rValue);
       writeValue(otherState, memoryOfField, fieldOffset, rValueType, SMGKnownSymValue.ZERO, cfaEdge);
       mallocFailState = otherState;
+      plotWhenConfigured("interesting", null, mallocFailState, cfaEdge.getDescription());
     }
 
     return newState;
