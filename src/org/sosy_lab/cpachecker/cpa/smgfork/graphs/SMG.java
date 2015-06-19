@@ -67,6 +67,11 @@ public class SMG {
   final private static int nullAddress = 0;
 
   /**
+   * A set of SMG items added in last iteration
+   */
+  final protected HashSet<Object> addedItems = new HashSet<>();
+
+  /**
    * Constructor.
    *
    * Consistent after call: yes.
@@ -253,6 +258,7 @@ public class SMG {
   final public void addObject(final SMGObject pObj, final boolean pValidity) {
     objects.add(pObj);
     object_validity.put(pObj, pValidity);
+    addedItems.add(pObj);
   }
 
   /**
@@ -264,6 +270,7 @@ public class SMG {
    */
   final public void addValue(Integer pValue) {
     values.add(pValue);
+    addedItems.add(pValue);
   }
 
   /**
@@ -275,6 +282,7 @@ public class SMG {
    */
   final public void addPointsToEdge(SMGEdgePointsTo pEdge) {
     pt_edges.put(pEdge.getValue(), pEdge);
+    addedItems.add(pEdge);
   }
 
   /**
@@ -286,6 +294,7 @@ public class SMG {
    */
   final public void addHasValueEdge(SMGEdgeHasValue pEdge) {
     hv_edges.add(pEdge);
+    addedItems.add(pEdge);
   }
 
   /**
@@ -337,6 +346,7 @@ public class SMG {
   public void replaceHVSet(Set<SMGEdgeHasValue> pNewHV) {
     hv_edges.clear();
     hv_edges.addAll(pNewHV);
+    addedItems.addAll(pNewHV);
   }
 
   /**
@@ -571,6 +581,7 @@ public class SMG {
     }
     hv_edges.clear();
     hv_edges.addAll(new_hv_edges);
+    addedItems.addAll(new_hv_edges);
     // TODO: Handle PT Edges: I'm not entirely sure how they should be handled
   }
 
@@ -581,6 +592,15 @@ public class SMG {
   public Set<Integer> getNeqsForValue(Integer pV) {
     return neq.getNeqsForValue(pV);
   }
+
+  final public boolean isAdded(Object pObj){
+    return addedItems.contains(pObj);
+  }
+
+  final public void clearAdded(){
+    addedItems.clear();
+  }
+
 }
 
 final class SMGConsistencyVerifier {
@@ -945,4 +965,5 @@ final class NeqRelation {
       }
     }
   }
+
 }

@@ -553,10 +553,11 @@ public class SMGTransferRelation extends SingleEdgeTransferRelation {
       mallocFailState.setPredecessor(smgState);
       result = ImmutableSet.of(successor, mallocFailState);
       mallocFailState = null;
-    } else {successor.setPredecessor(smgState);
+    } else {
+      successor.setPredecessor(smgState);
       result = Collections.singleton(successor);
     }
- for (SMGState smg : result) {
+    for (SMGState smg : result) {
       plotWhenConfigured("every", null, smg, cfaEdge.getDescription());
     }
 

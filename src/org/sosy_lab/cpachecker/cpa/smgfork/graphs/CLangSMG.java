@@ -39,6 +39,7 @@ import org.sosy_lab.cpachecker.cfa.types.MachineModel;
 import org.sosy_lab.cpachecker.cpa.smgfork.CLangStackFrame;
 import org.sosy_lab.cpachecker.cpa.smgfork.SMGEdgeHasValue;
 import org.sosy_lab.cpachecker.cpa.smgfork.SMGEdgeHasValueFilter;
+import org.sosy_lab.cpachecker.cpa.smgfork.SMGEdgePointsTo;
 import org.sosy_lab.cpachecker.cpa.smgfork.objects.SMGObject;
 import org.sosy_lab.cpachecker.cpa.smgfork.objects.SMGRegion;
 
@@ -208,6 +209,7 @@ public class CLangSMG extends SMG implements WritableSMG, ReadableSMG {
       super.addObject(newFrame.getReturnObject());
     }
     stack_objects.push(newFrame);
+    addedItems.add(newFrame);
   }
 
   /**

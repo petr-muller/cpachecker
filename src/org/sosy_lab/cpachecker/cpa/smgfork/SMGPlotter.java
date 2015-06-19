@@ -77,8 +77,10 @@ class SMGNodeDotVisitor implements SMGObjectVisitor {
     smg = pSmg;
   }
 
-  private String defaultDefinition(String pColor, String pShape, String pStyle, SMGObject pObject) {
-    return "color=" + pColor + ", shape=" + pShape + ", style=" + pStyle + ", label =\"" + pObject.toString() + "\"";
+  private String defaultDefinition(String pColor, String pShape, String pStyle, String pFontname,
+      SMGObject pObject) {
+    return "color=" + pColor + ", fontname=" + pFontname + ", shape=" + pShape + ", style=" + pStyle
+        + ", label =\"" + pObject.toString() + "\"";
   }
 
   @Override
@@ -86,13 +88,14 @@ class SMGNodeDotVisitor implements SMGObjectVisitor {
     String shape = "rectangle";
     String color;
     String style;
+    String fontname = smg.isAdded(pRegion) ? "\"times bold\"" : "times";
     if (smg.isObjectValid(pRegion)) {
-      color="black"; style="solid";
+      color="black"; style = smg.isAdded(pRegion) ? "bold" : "solid";
     } else {
-      color="red"; style="dotted";
+      color="red"; style = smg.isAdded(pRegion) ? "\"dotted,bold\"" : "dotted";
     }
 
-    node = new SMGObjectNode("region", defaultDefinition(color, shape, style, pRegion));
+    node = new SMGObjectNode("region", defaultDefinition(color, shape, style, fontname, pRegion));
   }
 
   @Override
@@ -105,7 +108,8 @@ class SMGNodeDotVisitor implements SMGObjectVisitor {
     }
 
     String style = "dashed";
-    node = new SMGObjectNode("sll", defaultDefinition(color, shape, style, pSll));
+    String fontname = smg.isAdded(pSll) ? "\"times bold\"" : "times";
+    node = new SMGObjectNode("sll", defaultDefinition(color, shape, style, fontname, pSll));
   }
 
   @Override
@@ -167,7 +171,7 @@ public final class SMGPlotter {
 
     for (int value : smg.getValues()) {
       if (value != smg.getNullValue()) {
-        sb.append(newLineWithOffset(smgValueAsDot(value, explicitValues)));
+        sb.append(newLineWithOffset(smgValueAsDot(value, explicitValues, smg)));
       }
     }
 
@@ -184,12 +188,12 @@ public final class SMGPlotter {
     }
 
     for (SMGEdgeHasValue edge: smg.getHVEdges()) {
-      sb.append(newLineWithOffset(smgHVEdgeAsDot(edge)));
+      sb.append(newLineWithOffset(smgHVEdgeAsDot(edge, smg)));
     }
 
     for (SMGEdgePointsTo edge: smg.getPTEdges().values()) {
       if (edge.getValue() != smg.getNullValue()) {
-        sb.append(newLineWithOffset(smgPTEdgeAsDot(edge)));
+        sb.append(newLineWithOffset(smgPTEdgeAsDot(edge, smg)));
       }
     }
 
@@ -205,16 +209,18 @@ public final class SMGPlotter {
 
     int i = pSmg.getStackFrames().size();
     for (CLangStackFrame stack_item : pSmg.getStackFrames()) {
-      addStackItemSubgraph(stack_item, pSb, i);
+      addStackItemSubgraph(pSmg, stack_item, pSb, i);
       i--;
     }
     offset -= 2;
     pSb.append(newLineWithOffset("}"));
   }
 
-  private void addStackItemSubgraph(CLangStackFrame pStackFrame, StringBuilder pSb, int pIndex) {
+  private void addStackItemSubgraph(CLangSMG pSmg, CLangStackFrame pStackFrame, StringBuilder pSb, int pIndex) {
     pSb.append(newLineWithOffset("subgraph cluster_stack_" + pStackFrame.getFunctionDeclaration().getName() + "{"));
     offset += 2;
+    String style = pSmg.isAdded(pStackFrame) ? "bold" : "solid";
+    pSb.append(newLineWithOffset("style=" + style + ";"));
     pSb.append(newLineWithOffset("fontcolor=blue;"));
     pSb.append(newLineWithOffset("label=\"#" + pIndex + ": " + pStackFrame.getFunctionDeclaration().toASTString() + "\";"));
 
@@ -272,21 +278,32 @@ public final class SMGPlotter {
     return "value_null_" + SMGPlotter.nulls;
   }
 
-  private String smgHVEdgeAsDot(SMGEdgeHasValue pEdge) {
+  private String smgHVEdgeAsDot(SMGEdgeHasValue pEdge, CLangSMG smg) {
+    String style = smg.isAdded(pEdge) ? "bold" : "solid";
+    String fontname = smg.isAdded(pEdge) ? "\"times bold\"" : "\"times\"";
     if (pEdge.getValue() == 0) {
       String newNull = newNullLabel();
-      return newNull + "[shape=plaintext, label=\"NULL\"];" + objectIndex.get(pEdge.getObject()).getName() + " -> " + newNull + "[label=\"[" + pEdge.getOffset() + "]\"];";
+      return newNull + "[style=" + style + ", fontname=" + fontname + ", shape=plaintext, label=\"NULL\"];" +
+          objectIndex.get(pEdge.getObject()).getName() + " -> " + newNull + "[style=" + style +
+          ", fontname=" + fontname + ", label=\"[" + pEdge.getOffset() + "]\"];";
     } else {
-      return objectIndex.get(pEdge.getObject()).getName() + " -> value_" + pEdge.getValue() + "[label=\"[" + pEdge.getOffset() + "]\"];";
+      return objectIndex.get(pEdge.getObject()).getName() + " -> value_" + pEdge.getValue() +
+          "[style=" + style + ", fontname=" + fontname + ", label=\"[" + pEdge.getOffset() + "]\"];";
     }
   }
 
-  private String smgPTEdgeAsDot(SMGEdgePointsTo pEdge) {
-    return "value_" + pEdge.getValue() + " -> " + objectIndex.get(pEdge.getObject()).getName() + "[label=\"+" + pEdge.getOffset() + "b\"];";
+  private String smgPTEdgeAsDot(SMGEdgePointsTo pEdge, CLangSMG smg) {
+    String style = smg.isAdded(pEdge) ? "bold" : "solid";
+    String fontname = smg.isAdded(pEdge) ? "\"times bold\"" : "times";
+    return "value_" + pEdge.getValue() + " -> " + objectIndex.get(pEdge.getObject()).getName() +
+        "[style=" + style + ", fontname=" + fontname + ", label=\"+" + pEdge.getOffset() + "b\"];";
   }
 
-  private static String smgValueAsDot(int value, Map<SMGKnownSymValue, SMGKnownExpValue> explicitValues) {
+  private static String smgValueAsDot(int value, Map<SMGKnownSymValue, SMGKnownExpValue> explicitValues,
+      CLangSMG smg) {
 
+    String style = smg.isAdded(value) ? "bold" : "solid";
+    String fontname = smg.isAdded(value) ? "\"times bold\"" : "times";
 
     String explicitValue = "";
 
@@ -296,7 +313,8 @@ public final class SMGPlotter {
       explicitValue = " : " + String.valueOf(explicitValues.get(symValue).getAsLong());
     }
 
-    return "value_" + value + "[label=\"#" + value + explicitValue +  "\"];";
+    return "value_" + value + "[style=" + style + ", fontname=" + fontname + ", label=\"#" + value +
+        explicitValue +  "\"];";
   }
 
   private static String neqRelationAsDot(Integer v1, Integer v2) {
