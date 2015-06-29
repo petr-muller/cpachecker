@@ -88,7 +88,7 @@ class SMGNodeDotVisitor implements SMGObjectVisitor {
     String shape = "rectangle";
     String color;
     String style;
-    String fontname = smg.isAdded(pRegion) ? "\"times bold\"" : "times";
+    String fontname = smg.isAdded(pRegion) ? "\"Times-Roman bold\"" : "\"Times-Roman\"";
     if (smg.isObjectValid(pRegion)) {
       color="black"; style = smg.isAdded(pRegion) ? "bold" : "solid";
     } else {
@@ -108,7 +108,7 @@ class SMGNodeDotVisitor implements SMGObjectVisitor {
     }
 
     String style = "dashed";
-    String fontname = smg.isAdded(pSll) ? "\"times bold\"" : "times";
+    String fontname = smg.isAdded(pSll) ? "\"Times-Roman bold\"" : "\"Times-Roman\"";
     node = new SMGObjectNode("sll", defaultDefinition(color, shape, style, fontname, pSll));
   }
 
@@ -280,7 +280,7 @@ public final class SMGPlotter {
 
   private String smgHVEdgeAsDot(SMGEdgeHasValue pEdge, CLangSMG smg) {
     String style = smg.isAdded(pEdge) ? "bold" : "solid";
-    String fontname = smg.isAdded(pEdge) ? "\"times bold\"" : "\"times\"";
+    String fontname = smg.isAdded(pEdge) ? "\"Times-Roman bold\"" : "\"Times-Roman\"";
     if (pEdge.getValue() == 0) {
       String newNull = newNullLabel();
       return newNull + "[style=" + style + ", fontname=" + fontname + ", shape=plaintext, label=\"NULL\"];" +
@@ -294,7 +294,7 @@ public final class SMGPlotter {
 
   private String smgPTEdgeAsDot(SMGEdgePointsTo pEdge, CLangSMG smg) {
     String style = smg.isAdded(pEdge) ? "bold" : "solid";
-    String fontname = smg.isAdded(pEdge) ? "\"times bold\"" : "times";
+    String fontname = smg.isAdded(pEdge) ? "\"Times-Roman bold\"" : "\"Times-Roman\"";
     return "value_" + pEdge.getValue() + " -> " + objectIndex.get(pEdge.getObject()).getName() +
         "[style=" + style + ", fontname=" + fontname + ", label=\"+" + pEdge.getOffset() + "b\"];";
   }
@@ -303,7 +303,7 @@ public final class SMGPlotter {
       CLangSMG smg) {
 
     String style = smg.isAdded(value) ? "bold" : "solid";
-    String fontname = smg.isAdded(value) ? "\"times bold\"" : "times";
+    String fontname = smg.isAdded(value) ? "\"Times-Roman bold\"" : "\"Times-Roman\"";
 
     String explicitValue = "";
 
