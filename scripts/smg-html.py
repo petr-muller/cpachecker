@@ -3,33 +3,36 @@
 import os
 import re
 import json
+import argparse
+import shutil
+import subprocess
 
-# create directories if don't exist
-dirMain = "../output/smg-html"
-dirImg = "../output/smg-html/img"
-dirOutput = "../output"
-if not os.path.exists(dirMain):
-    os.makedirs(dirMain)
-if not os.path.exists(dirImg):
-    os.makedirs(dirImg)
 
-# clear main directory
-for fileName in os.listdir(dirMain):
-    filePath = os.path.join(dirMain, fileName)
-    try:
-        if os.path.isfile(filePath):
-            os.unlink(filePath)
-    except Exception, e:
-        raise e
+# directory type for argument parsing
+def rw_directory(directory):
+    if not os.path.isdir(directory):
+        raise argparse.ArgumentTypeError("{0} is not a valid directory".format(directory))
+    if not os.access(directory, os.W_OK):
+        raise argparse.ArgumentTypeError("{0} is not writable".format(directory))
+    if not os.access(directory, os.R_OK):
+        raise argparse.ArgumentTypeError("{0} is not readable".format(directory))
+    return directory
 
-# clear img/ directory
-for fileName in os.listdir(dirImg):
-    filePath = os.path.join(dirImg, fileName)
-    try:
-        if os.path.isfile(filePath):
-            os.unlink(filePath)
-    except Exception, e:
-        raise e
+# parsing input arguments
+parser = argparse.ArgumentParser(description="Visualises CPAlien analysis using HTML")
+parser.add_argument("dir", help="location of dot files to be visualised", type=rw_directory)
+
+args = parser.parse_args()
+
+# delete existing directories and recreate them
+dirMain = os.path.abspath(os.path.join(args.dir, "smg-html/"))
+dirImg = os.path.abspath(os.path.join(args.dir, "smg-html/img/"))
+dirOutput = os.path.abspath(args.dir)
+
+if os.path.exists(dirMain):
+    shutil.rmtree(dirMain)
+os.makedirs(dirMain)
+os.makedirs(dirImg)
 
 
 # class for tree representing the SMG anaysis structure
@@ -62,15 +65,14 @@ def parseName(name):
 
 
 # create images from dot files and save them to the list
-dirOutput = "../output"
 smgRegex = re.compile("^smg.*\.dot$")
 for fileName in sorted(os.listdir(dirOutput)):
     if smgRegex.match(fileName):
         filePath = os.path.join(dirOutput, fileName)
         (name, ext) = os.path.splitext(fileName)
-        destPath = os.path.join(dirImg, name + ".png")
-        dotCmd = "dot -Tpng " + filePath + " -o " + destPath
-        os.system(dotCmd)
+        destPath = os.path.join(dirImg, name + ".svg")
+        dotCmd = "dot -Tsvg " + filePath + " -o " + destPath
+        subprocess.Popen(dotCmd.split())
         # create new dot list item
         parseName(name)
 
@@ -154,15 +156,6 @@ for number, smg in smgDict.items():
             # add new SMG to dictionary
             smgDict[newSmg.number] = newSmg
 
-# print the final tree structure
-# for number, smg in sorted(smgDict.items()):
-#     print smg.number + ":"
-#     print smg.fileName
-#     if smg.succ:
-#         for succ in smg.succ:
-#             print succ
-#     print "\n"
-
 
 # create html files
 def getHtmlFile(name):
@@ -199,7 +192,7 @@ for number, smg in smgDict.items():
     htmlText += """
         <br>
         <img src="img/{}" />
-    """.format(smg.fileName + ".png")
+    """.format(smg.fileName + ".svg")
     htmlText += """
     </body>
     </html>
