@@ -38,6 +38,7 @@ import java.util.logging.Level;
 import org.sosy_lab.common.log.LogManager;
 import org.sosy_lab.cpachecker.cfa.types.MachineModel;
 import org.sosy_lab.cpachecker.cfa.types.c.CType;
+import org.sosy_lab.cpachecker.cpa.smgfork.CLangStackFrame;
 import org.sosy_lab.cpachecker.cpa.smgfork.SMGEdge;
 import org.sosy_lab.cpachecker.cpa.smgfork.SMGEdgeHasValue;
 import org.sosy_lab.cpachecker.cpa.smgfork.SMGEdgeHasValueFilter;
@@ -70,6 +71,13 @@ public class SMG {
    * A set of SMG items added in last iteration
    */
   final protected HashSet<Object> addedItems = new HashSet<>();
+  /*
+   * Containers with SMG elements removed in last iteration. Must be individual for each element type.
+   */
+  final private HashSet<SMGObject> removedObjects = new HashSet<>();
+  final private HashSet<Integer> removedValues = new HashSet<>();
+  final private HashSet<SMGEdgeHasValue> removedHvEdges = new HashSet<>();
+  final private HashSet<SMGEdgePointsTo> removedPtEdges = new HashSet<>();
 
   /**
    * Constructor.
@@ -107,6 +115,8 @@ public class SMG {
     object_validity.putAll(pHeap.object_validity);
 
     machine_model = pHeap.machine_model;
+
+    addedItems.addAll(pHeap.addedItems);
 
     neq.putAll(pHeap.neq);
   }
@@ -208,6 +218,7 @@ public class SMG {
   final public void removeValue(final Integer pValue) {
     values.remove(pValue);
     neq.removeValue(pValue);
+    removedValues.add(pValue);
   }
   /**
    * Remove {@link pObj} from the SMG. This method does not remove
@@ -220,6 +231,7 @@ public class SMG {
   final public void removeObject(final SMGObject pObj) {
     objects.remove(pObj);
     object_validity.remove(pObj);
+    removedObjects.add(pObj);
   }
 
   /**
@@ -234,14 +246,18 @@ public class SMG {
     Iterator<SMGEdgeHasValue> hv_iter = hv_edges.iterator();
     Iterator<SMGEdgePointsTo> pt_iter = pt_edges.values().iterator();
     while (hv_iter.hasNext()) {
-      if (hv_iter.next().getObject() == pObj) {
+      SMGEdgeHasValue edge = hv_iter.next();
+      if (edge.getObject() == pObj) {
         hv_iter.remove();
+        removedHvEdges.add(edge);
       }
     }
 
     while (pt_iter.hasNext()) {
-      if (pt_iter.next().getObject() == pObj) {
+      SMGEdgePointsTo edge = pt_iter.next();
+      if (edge.getObject() == pObj) {
         pt_iter.remove();
+        removedPtEdges.add(edge);
       }
     }
   }
@@ -306,6 +322,7 @@ public class SMG {
    */
   final public void removeHasValueEdge(SMGEdgeHasValue pEdge) {
     hv_edges.remove(pEdge);
+    removedHvEdges.add(pEdge);
   }
 
   /**
@@ -317,6 +334,7 @@ public class SMG {
    */
   final public void removePointsToEdge(int pValue) {
     pt_edges.remove(pValue);
+    removedPtEdges.add(pt_edges.get(pValue));
   }
 
   /**
@@ -344,6 +362,7 @@ public class SMG {
    * Keeps consistency: no
    */
   public void replaceHVSet(Set<SMGEdgeHasValue> pNewHV) {
+    removedHvEdges.addAll(hv_edges);
     hv_edges.clear();
     hv_edges.addAll(pNewHV);
     addedItems.addAll(pNewHV);
@@ -444,7 +463,7 @@ public class SMG {
    * @return Unmodifiable view on Points-To edges set.
    */
   final public Map<Integer, SMGEdgePointsTo> getPTEdges() {
-    return Collections.unmodifiableMap(pt_edges );
+    return Collections.unmodifiableMap(pt_edges);
   }
 
   /**
@@ -545,7 +564,8 @@ public class SMG {
   }
 
   public boolean isCoveredByNullifiedBlocks(SMGEdgeHasValue pEdge) {
-    return isCoveredByNullifiedBlocks(pEdge.getObject(), pEdge.getOffset(), pEdge.getSizeInBytes(machine_model));
+    return isCoveredByNullifiedBlocks(pEdge.getObject(), pEdge.getOffset(),
+        pEdge.getSizeInBytes(machine_model));
   }
 
   public boolean isCoveredByNullifiedBlocks(SMGObject pObject, int pOffset, CType pType ) {
@@ -597,10 +617,15 @@ public class SMG {
     return addedItems.contains(pObj);
   }
 
-  final public void clearAdded(){
+  final public void clearAdded() {
     addedItems.clear();
   }
 
+  final public HashSet<SMGEdgeHasValue> getRemovedHvEdges() { return removedHvEdges; }
+
+  final public HashSet<SMGEdgePointsTo> getRemovedPtEdges() { return removedPtEdges; }
+
+  final public HashSet<Integer> getRemovedValues() { return removedValues; }
 }
 
 final class SMGConsistencyVerifier {

@@ -77,9 +77,9 @@ class SMGNodeDotVisitor implements SMGObjectVisitor {
     smg = pSmg;
   }
 
-  private String defaultDefinition(String pColor, String pShape, String pStyle, String pFontname,
+  private String defaultDefinition(String pColor, String pShape, String pStyle, String pFontcolor,
       SMGObject pObject) {
-    return "color=" + pColor + ", fontname=" + pFontname + ", shape=" + pShape + ", style=" + pStyle
+    return "color=" + pColor + ", fontcolor=" + pFontcolor + ", shape=" + pShape + ", style=" + pStyle
         + ", label =\"" + pObject.toString() + "\"";
   }
 
@@ -88,14 +88,16 @@ class SMGNodeDotVisitor implements SMGObjectVisitor {
     String shape = "rectangle";
     String color;
     String style;
-    String fontname = smg.isAdded(pRegion) ? "\"Times-Roman bold\"" : "\"Times-Roman\"";
+    String fontcolor = smg.isAdded(pRegion) ? "green" : "black";
     if (smg.isObjectValid(pRegion)) {
-      color="black"; style = smg.isAdded(pRegion) ? "bold" : "solid";
+      color = smg.isAdded(pRegion) ? "green" : "black";
+      style = "solid";
     } else {
-      color="red"; style = smg.isAdded(pRegion) ? "\"dotted,bold\"" : "dotted";
+      color = "red";
+      style = "dotted";
     }
 
-    node = new SMGObjectNode("region", defaultDefinition(color, shape, style, fontname, pRegion));
+    node = new SMGObjectNode("region", defaultDefinition(color, shape, style, fontcolor, pRegion));
   }
 
   @Override
@@ -108,8 +110,8 @@ class SMGNodeDotVisitor implements SMGObjectVisitor {
     }
 
     String style = "dashed";
-    String fontname = smg.isAdded(pSll) ? "\"Times-Roman bold\"" : "\"Times-Roman\"";
-    node = new SMGObjectNode("sll", defaultDefinition(color, shape, style, fontname, pSll));
+    String fontcolor = smg.isAdded(pSll) ? "green" : "black";
+    node = new SMGObjectNode("sll", defaultDefinition(color, shape, style, fontcolor, pSll));
   }
 
   @Override
@@ -219,10 +221,11 @@ public final class SMGPlotter {
   private void addStackItemSubgraph(CLangSMG pSmg, CLangStackFrame pStackFrame, StringBuilder pSb, int pIndex) {
     pSb.append(newLineWithOffset("subgraph cluster_stack_" + pStackFrame.getFunctionDeclaration().getName() + "{"));
     offset += 2;
-    String style = pSmg.isAdded(pStackFrame) ? "bold" : "solid";
-    pSb.append(newLineWithOffset("style=" + style + ";"));
+    String color = pSmg.isAdded(pStackFrame) ? "green" : "black";
+    pSb.append(newLineWithOffset("color=" + color + ";"));
     pSb.append(newLineWithOffset("fontcolor=blue;"));
-    pSb.append(newLineWithOffset("label=\"#" + pIndex + ": " + pStackFrame.getFunctionDeclaration().toASTString() + "\";"));
+    pSb.append(newLineWithOffset(
+        "label=\"#" + pIndex + ": " + pStackFrame.getFunctionDeclaration().toASTString() + "\";"));
 
     HashMap<String, SMGRegion> to_print = new HashMap<>();
     to_print.putAll(pStackFrame.getVariables());
@@ -232,19 +235,21 @@ public final class SMGPlotter {
       to_print.put(CLangStackFrame.RETVAL_LABEL, returnObject);
     }
 
-    pSb.append(newLineWithOffset(smgScopeFrameAsDot(to_print, String.valueOf(pIndex))));
+    pSb.append(smgScopeFrameAsDot(pSmg, to_print, String.valueOf(pIndex)));
 
     offset -= 2;
     pSb.append(newLineWithOffset("}"));
 
   }
 
-  private String smgScopeFrameAsDot(Map<String, SMGRegion> pNamespace, String pStructId) {
+  private String smgScopeFrameAsDot(CLangSMG pSmg, Map<String, SMGRegion> pNamespace, String pStructId) {
     StringBuilder sb = new StringBuilder();
-    sb.append("struct" + pStructId + "[shape=record,label=\" ");
 
-    // I sooo wish for Python list comprehension here...
-    ArrayList<String> nodes = new ArrayList<>();
+    sb.append(newLineWithOffset("struct" + pStructId + "[shape=none, label=<"));
+    offset += 2;
+    sb.append(newLineWithOffset("<table border=\"0\" cellborder=\"1\" cellpadding=\"9px\" cellspacing=\"0\"><tr>"));
+    offset += 2;
+
     for (Entry<String, SMGRegion> entry : pNamespace.entrySet()) {
       String key = entry.getKey();
       SMGObject obj = entry.getValue();
@@ -254,11 +259,15 @@ public final class SMGPlotter {
         key = "node1";
       }
 
-      nodes.add("<item_" + key + "> " + obj.toString());
+      String color = pSmg.isAdded(obj) ? "green" : "black";
+      sb.append(newLineWithOffset("<td port=\"item_" + key + "\" color=\"" + color + "\">" +
+          "<font color=\"" + color + "\">" + obj.toString() + "</font></td>"));
       objectIndex.put(obj, new SMGObjectNode("struct" + pStructId + ":item_" + key));
     }
-    sb.append(Joiner.on(" | ").join(nodes));
-    sb.append("\"];\n");
+    offset -= 2;
+    sb.append(newLineWithOffset("</tr></table>>];"));
+    offset -= 2;
+
     return sb.toString();
   }
 
@@ -267,7 +276,7 @@ public final class SMGPlotter {
       pSb.append(newLineWithOffset("subgraph cluster_global{"));
       offset += 2;
       pSb.append(newLineWithOffset("label=\"Global objects\";"));
-      pSb.append(newLineWithOffset(smgScopeFrameAsDot(pSmg.getGlobalObjects(), "global")));
+      pSb.append(newLineWithOffset(smgScopeFrameAsDot(pSmg, pSmg.getGlobalObjects(), "global")));
       offset -= 2;
       pSb.append(newLineWithOffset("}"));
     }
@@ -279,31 +288,28 @@ public final class SMGPlotter {
   }
 
   private String smgHVEdgeAsDot(SMGEdgeHasValue pEdge, CLangSMG smg) {
-    String style = smg.isAdded(pEdge) ? "bold" : "solid";
-    String fontname = smg.isAdded(pEdge) ? "\"Times-Roman bold\"" : "\"Times-Roman\"";
+    String color = smg.isAdded(pEdge) ? "green" : "black";
     if (pEdge.getValue() == 0) {
       String newNull = newNullLabel();
-      return newNull + "[style=" + style + ", fontname=" + fontname + ", shape=plaintext, label=\"NULL\"];" +
-          objectIndex.get(pEdge.getObject()).getName() + " -> " + newNull + "[style=" + style +
-          ", fontname=" + fontname + ", label=\"[" + pEdge.getOffset() + "]\"];";
+      return newNull + "[color=" + color + ", fontcolor=" + color + ", shape=plaintext, label=\"NULL\"];" +
+          objectIndex.get(pEdge.getObject()).getName() + " -> " + newNull + "[color=" + color +
+          ", fontcolor=" + color + ", label=\"[" + pEdge.getOffset() + "]\"];";
     } else {
       return objectIndex.get(pEdge.getObject()).getName() + " -> value_" + pEdge.getValue() +
-          "[style=" + style + ", fontname=" + fontname + ", label=\"[" + pEdge.getOffset() + "]\"];";
+          "[color=" + color + ", fontcolor=" + color + ", label=\"[" + pEdge.getOffset() + "]\"];";
     }
   }
 
   private String smgPTEdgeAsDot(SMGEdgePointsTo pEdge, CLangSMG smg) {
-    String style = smg.isAdded(pEdge) ? "bold" : "solid";
-    String fontname = smg.isAdded(pEdge) ? "\"Times-Roman bold\"" : "\"Times-Roman\"";
+    String color = smg.isAdded(pEdge) ? "green" : "black";
     return "value_" + pEdge.getValue() + " -> " + objectIndex.get(pEdge.getObject()).getName() +
-        "[style=" + style + ", fontname=" + fontname + ", label=\"+" + pEdge.getOffset() + "b\"];";
+        "[color=" + color + ", fontcolor=" + color + ", label=\"+" + pEdge.getOffset() + "b\"];";
   }
 
   private static String smgValueAsDot(int value, Map<SMGKnownSymValue, SMGKnownExpValue> explicitValues,
       CLangSMG smg) {
 
-    String style = smg.isAdded(value) ? "bold" : "solid";
-    String fontname = smg.isAdded(value) ? "\"Times-Roman bold\"" : "\"Times-Roman\"";
+    String color = smg.isAdded(value) ? "green" : "black";
 
     String explicitValue = "";
 
@@ -313,7 +319,7 @@ public final class SMGPlotter {
       explicitValue = " : " + String.valueOf(explicitValues.get(symValue).getAsLong());
     }
 
-    return "value_" + value + "[style=" + style + ", fontname=" + fontname + ", label=\"#" + value +
+    return "value_" + value + "[color=" + color + ", fontcolor=" + color + ", label=\"#" + value +
         explicitValue +  "\"];";
   }
 

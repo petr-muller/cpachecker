@@ -217,6 +217,13 @@ public class SMGState implements AbstractQueryableState, LatticeAbstractState<SM
     performConsistencyCheck(SMGRuntimeCheck.HALF);
   }
 
+  /**
+   * Clears added items container on the heap.
+   */
+  public void clearAdded() {
+    heap.clearAdded();
+  }
+
   /* ********************************************* */
   /* Non-modifying functions: getters and the like */
   /* ********************************************* */

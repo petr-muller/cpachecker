@@ -79,6 +79,10 @@ public class CLangSMG extends SMG implements WritableSMG, ReadableSMG {
 
   static private LogManager logger = null;
 
+  final private HashSet<CLangStackFrame> removedStackObjects = new HashSet<>();
+  final private HashSet<SMGObject> removedHeapObjects = new HashSet<>();
+  final private HashSet<SMGRegion> removedGlobalObjects = new HashSet<>();
+
   /**
    * A flag setting if the class should perform additional consistency checks.
    * It should be useful only during debugging, when is should find bad
@@ -237,6 +241,7 @@ public class CLangSMG extends SMG implements WritableSMG, ReadableSMG {
     for (SMGObject object : frame.getAllObjects()) {
       removeObjectAndEdges(object);
     }
+    removedStackObjects.add(frame);
 
     if (CLangSMG.performChecks()) {
       CLangSMGConsistencyVerifier.verifyCLangSMG(CLangSMG.logger, this);
@@ -303,7 +308,7 @@ public class CLangSMG extends SMG implements WritableSMG, ReadableSMG {
         }
         removeObjectAndEdges(stray_object);
         heap_objects.remove(stray_object);
-
+        removedHeapObjects.add(stray_object);
       }
     }
 
@@ -387,6 +392,12 @@ public class CLangSMG extends SMG implements WritableSMG, ReadableSMG {
     return Collections.unmodifiableSet(heap_objects);
   }
 
+  public HashSet<SMGObject> getRemovedHeapObjects() { return removedHeapObjects; }
+
+  public boolean isRemoved(SMGObject heapObject) {
+    return removedHeapObjects.contains(heapObject);
+  }
+
   /**
    * Constant.
    *
@@ -455,5 +466,6 @@ public class CLangSMG extends SMG implements WritableSMG, ReadableSMG {
   final public void removeHeapObjectAndEdges(SMGObject pObject) {
     heap_objects.remove(pObject);
     removeObjectAndEdges(pObject);
+    removedHeapObjects.add(pObject);
   }
 }

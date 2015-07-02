@@ -152,11 +152,6 @@ public class SMGTransferRelation extends SingleEdgeTransferRelation {
    */
   public static final String FUNCTION_RETURN_VAR = "___cpa_temp_result_var_";
 
-  /**
-   * Path to the file where analysis tree for visualisation is stored
-   */
-//  private Path analysisSchema;
-
   private class SMGBuiltins {
 
     private static final int MEMSET_BUFFER_PARAMETER = 0;
@@ -446,6 +441,7 @@ public class SMGTransferRelation extends SingleEdgeTransferRelation {
 
     if (pConfig.equals(exportSMG)) {
       builtins.dumpSMGPlot(pName, pState, pLocation);
+      pState.clearAdded();
     }
   }
 
