@@ -81,7 +81,6 @@ public class CLangSMG extends SMG implements WritableSMG, ReadableSMG {
 
   final private HashSet<CLangStackFrame> removedStackObjects = new HashSet<>();
   final private HashSet<SMGObject> removedHeapObjects = new HashSet<>();
-  final private HashSet<SMGRegion> removedGlobalObjects = new HashSet<>();
 
   /**
    * A flag setting if the class should perform additional consistency checks.
@@ -393,6 +392,8 @@ public class CLangSMG extends SMG implements WritableSMG, ReadableSMG {
   }
 
   public HashSet<SMGObject> getRemovedHeapObjects() { return removedHeapObjects; }
+
+  public HashSet<CLangStackFrame> getRemovedStackFrames() { return removedStackObjects; }
 
   public boolean isRemoved(SMGObject heapObject) {
     return removedHeapObjects.contains(heapObject);

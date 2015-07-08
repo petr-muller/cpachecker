@@ -44,6 +44,7 @@ import org.sosy_lab.cpachecker.cpa.smgfork.objects.sll.SMGSingleLinkedList;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
+import com.sun.org.apache.xpath.internal.operations.Bool;
 
 final class SMGObjectNode {
   private final String name;
@@ -89,7 +90,11 @@ class SMGNodeDotVisitor implements SMGObjectVisitor {
     String color;
     String style;
     String fontcolor = smg.isAdded(pRegion) ? "green" : "black";
-    if (smg.isObjectValid(pRegion)) {
+    if (smg.isRemoved(pRegion)) {
+      color = "grey";
+      style = "solid";
+      fontcolor = "grey";
+    } else if (smg.isObjectValid(pRegion)) {
       color = smg.isAdded(pRegion) ? "green" : "black";
       style = "solid";
     } else {
@@ -105,7 +110,9 @@ class SMGNodeDotVisitor implements SMGObjectVisitor {
     String shape = "rectangle";
     String color = "blue";
 
-    if (! smg.isObjectValid(pSll)) {
+    if (smg.isRemoved(pSll)) {
+      color = " grey";
+    } else if (! smg.isObjectValid(pSll)) {
       color="red";
     }
 
@@ -169,11 +176,27 @@ public final class SMGPlotter {
       }
     }
 
+    for (SMGObject heapObject : smg.getRemovedHeapObjects()) {
+      if (! objectIndex.containsKey(heapObject)) {
+        visitor.visit(heapObject);
+        objectIndex.put(heapObject, visitor.getNode());
+      }
+      if (heapObject.notNull()) {
+        sb.append(newLineWithOffset(objectIndex.get(heapObject).getDefinition()));
+      }
+    }
+
     addGlobalObjectSubgraph(smg, sb);
 
     for (int value : smg.getValues()) {
       if (value != smg.getNullValue()) {
-        sb.append(newLineWithOffset(smgValueAsDot(value, explicitValues, smg)));
+        sb.append(newLineWithOffset(smgValueAsDot(value, explicitValues, smg, false)));
+      }
+    }
+
+    for (int value : smg.getRemovedValues()) {
+      if (value != smg.getNullValue()) {
+        sb.append(newLineWithOffset(smgValueAsDot(value, explicitValues, smg, true)));
       }
     }
 
@@ -190,12 +213,22 @@ public final class SMGPlotter {
     }
 
     for (SMGEdgeHasValue edge: smg.getHVEdges()) {
-      sb.append(newLineWithOffset(smgHVEdgeAsDot(edge, smg)));
+      sb.append(newLineWithOffset(smgHVEdgeAsDot(edge, smg, false)));
     }
 
     for (SMGEdgePointsTo edge: smg.getPTEdges().values()) {
       if (edge.getValue() != smg.getNullValue()) {
-        sb.append(newLineWithOffset(smgPTEdgeAsDot(edge, smg)));
+        sb.append(newLineWithOffset(smgPTEdgeAsDot(edge, smg, false)));
+      }
+    }
+
+    for (SMGEdgeHasValue edge: smg.getRemovedHvEdges()) {
+      sb.append(newLineWithOffset(smgHVEdgeAsDot(edge, smg, true)));
+    }
+
+    for (SMGEdgePointsTo edge: smg.getRemovedPtEdges()) {
+      if (edge.getValue() != smg.getNullValue()) {
+        sb.append(newLineWithOffset(smgPTEdgeAsDot(edge, smg, true)));
       }
     }
 
@@ -210,18 +243,29 @@ public final class SMGPlotter {
     pSb.append(newLineWithOffset("label=\"Stack\";"));
 
     int i = pSmg.getStackFrames().size();
+    int j = pSmg.getRemovedStackFrames().size() + i;
     for (CLangStackFrame stack_item : pSmg.getStackFrames()) {
-      addStackItemSubgraph(pSmg, stack_item, pSb, i);
+      addStackItemSubgraph(pSmg, stack_item, pSb, i, false);
       i--;
+    }
+    for (CLangStackFrame stack_item : pSmg.getRemovedStackFrames()) {
+      addStackItemSubgraph(pSmg, stack_item, pSb, j, true);
+      j--;
     }
     offset -= 2;
     pSb.append(newLineWithOffset("}"));
   }
 
-  private void addStackItemSubgraph(CLangSMG pSmg, CLangStackFrame pStackFrame, StringBuilder pSb, int pIndex) {
+  private void addStackItemSubgraph(CLangSMG pSmg, CLangStackFrame pStackFrame, StringBuilder pSb,
+      int pIndex, Boolean removed) {
     pSb.append(newLineWithOffset("subgraph cluster_stack_" + pStackFrame.getFunctionDeclaration().getName() + "{"));
     offset += 2;
-    String color = pSmg.isAdded(pStackFrame) ? "green" : "black";
+    String color;
+    if (removed) {
+      color = "grey";
+    } else {
+      color = pSmg.isAdded(pStackFrame) ? "green" : "black";
+    }
     pSb.append(newLineWithOffset("color=" + color + ";"));
     pSb.append(newLineWithOffset("fontcolor=blue;"));
     pSb.append(newLineWithOffset(
@@ -235,14 +279,18 @@ public final class SMGPlotter {
       to_print.put(CLangStackFrame.RETVAL_LABEL, returnObject);
     }
 
-    pSb.append(smgScopeFrameAsDot(pSmg, to_print, String.valueOf(pIndex)));
+    if (removed)
+      pSb.append(smgScopeFrameAsDot(pSmg, to_print, String.valueOf(pIndex), true));
+    else
+      pSb.append(smgScopeFrameAsDot(pSmg, to_print, String.valueOf(pIndex), false));
 
     offset -= 2;
     pSb.append(newLineWithOffset("}"));
 
   }
 
-  private String smgScopeFrameAsDot(CLangSMG pSmg, Map<String, SMGRegion> pNamespace, String pStructId) {
+  private String smgScopeFrameAsDot(CLangSMG pSmg, Map<String, SMGRegion> pNamespace, String pStructId,
+      Boolean removed) {
     StringBuilder sb = new StringBuilder();
 
     sb.append(newLineWithOffset("struct" + pStructId + "[shape=none, label=<"));
@@ -259,7 +307,12 @@ public final class SMGPlotter {
         key = "node1";
       }
 
-      String color = pSmg.isAdded(obj) ? "green" : "black";
+      String color;
+      if (removed){
+        color = "grey";
+      } else {
+        color = pSmg.isAdded(obj) ? "green" : "black";
+      }
       sb.append(newLineWithOffset("<td port=\"item_" + key + "\" color=\"" + color + "\">" +
           "<font color=\"" + color + "\">" + obj.toString() + "</font></td>"));
       objectIndex.put(obj, new SMGObjectNode("struct" + pStructId + ":item_" + key));
@@ -276,7 +329,7 @@ public final class SMGPlotter {
       pSb.append(newLineWithOffset("subgraph cluster_global{"));
       offset += 2;
       pSb.append(newLineWithOffset("label=\"Global objects\";"));
-      pSb.append(newLineWithOffset(smgScopeFrameAsDot(pSmg, pSmg.getGlobalObjects(), "global")));
+      pSb.append(newLineWithOffset(smgScopeFrameAsDot(pSmg, pSmg.getGlobalObjects(), "global", false)));
       offset -= 2;
       pSb.append(newLineWithOffset("}"));
     }
@@ -287,8 +340,13 @@ public final class SMGPlotter {
     return "value_null_" + SMGPlotter.nulls;
   }
 
-  private String smgHVEdgeAsDot(SMGEdgeHasValue pEdge, CLangSMG smg) {
-    String color = smg.isAdded(pEdge) ? "green" : "black";
+  private String smgHVEdgeAsDot(SMGEdgeHasValue pEdge, CLangSMG smg, Boolean removed) {
+    String color;
+    if (removed) {
+      color = "grey";
+    } else {
+     color = smg.isAdded(pEdge) ? "green" : "black";
+    }
     if (pEdge.getValue() == 0) {
       String newNull = newNullLabel();
       return newNull + "[color=" + color + ", fontcolor=" + color + ", shape=plaintext, label=\"NULL\"];" +
@@ -300,16 +358,26 @@ public final class SMGPlotter {
     }
   }
 
-  private String smgPTEdgeAsDot(SMGEdgePointsTo pEdge, CLangSMG smg) {
-    String color = smg.isAdded(pEdge) ? "green" : "black";
+  private String smgPTEdgeAsDot(SMGEdgePointsTo pEdge, CLangSMG smg, Boolean removed) {
+    String color;
+    if (removed) {
+      color = "grey";
+    } else {
+      color = smg.isAdded(pEdge) ? "green" : "black";
+    }
     return "value_" + pEdge.getValue() + " -> " + objectIndex.get(pEdge.getObject()).getName() +
         "[color=" + color + ", fontcolor=" + color + ", label=\"+" + pEdge.getOffset() + "b\"];";
   }
 
   private static String smgValueAsDot(int value, Map<SMGKnownSymValue, SMGKnownExpValue> explicitValues,
-      CLangSMG smg) {
+      CLangSMG smg, Boolean removed) {
 
-    String color = smg.isAdded(value) ? "green" : "black";
+    String color;
+    if (removed) {
+      color = "grey";
+    } else {
+     color = smg.isAdded(value) ? "green" : "black";
+    }
 
     String explicitValue = "";
 
